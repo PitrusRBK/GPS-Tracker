@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>GPS Tracker</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+    }
+
+    .value {
+      font-size: 40px;
+      margin: 15px 0;
+    }
+
+    button {
+      margin: 10px;
+      padding: 10px 25px;
+      font-size: 18px;
+      background-color: #1e88e5;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background-color: #1565c0;
+    }
+  </style>
+</head>
+<body>
+  <h1>GPS Tracker</h1>
+  <div class="value" id="speed">Prędkość: 0 km/h</div>
+  <div class="value" id="distance">Dystans: 0 m</div>
+  <div class="value" id="duration">Czas: 0s</div>
+
+  <button onclick="startTracking()">Start</button>
+  <button onclick="stopTracking()">Stop</button>
+  <button onclick="resetTracking()">Reset</button>
+
+  <script>
+    let watchId = null;
+    let tracking = false;
+    let previousPosition = null;
+    let totalDistance = 0;
+    let startTime = null;
+    let timerInterval = null;
+
+    function startTracking() {
+      if (tracking) return;
+
+      tracking = true;
+
+      if (!startTime) startTime = Date.now();
+
+      timerInterval = setInterval(updateTimer, 1000);
+
+      if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          position => {
+            const speedMps = position.coords.speed;
+            const speedKmh = speedMps ? (speedMps * 3.6).toFixed(2) : 0;
+            document.getElementById("speed").textContent = `Prędkość: ${speedKmh} km/h`;
+
+            if (previousPosition) {
+              const dist = calculateDistance(
+                previousPosition.latitude,
+                previousPosition.longitude,
+                position.coords.latitude,
+                position.coords.longitude
+              );
+              totalDistance += dist;
+              updateDistanceDisplay();
+            }
+
+            previousPosition = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            };
+          },
+          error => {
+            document.getElementById("speed").textContent = "Błąd GPS: " + error.message;
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 5000
+          }
+        );
+      } else {
+        alert("Twoja przeglądarka nie obsługuje GPS.");
+      }
+    }
+
+    function stopTracking() {
+      tracking = false;
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      clearInterval(timerInterval);
+    }
+
+    function resetTracking() {
+      stopTracking();
+      watchId = null;
+      previousPosition = null;
+      totalDistance = 0;
+      startTime = null;
+      document.getElementById("speed").textContent = "Prędkość: 0 km/h";
+      document.getElementById("distance").textContent = "Dystans: 0 m";
+      document.getElementById("duration").textContent = "Czas: 0s";
+    }
+
+    function updateDistanceDisplay() {
+      if (totalDistance < 1000) {
+        document.getElementById("distance").textContent = `Dystans: ${Math.round(totalDistance)} m`;
+      } else {
+        const km = (totalDistance / 1000).toFixed(2);
+        document.getElementById("distance").textContent = `Dystans: ${km} km`;
+      }
+    }
+
+    function updateTimer() {
+      if (startTime) {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById("duration").textContent = `Czas: ${elapsed}s`;
+      }
+    }
+
+    // Haversine formula
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; // radius Earth in meters
+      const toRad = angle => angle * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // in meters
+    }
+  </script>
+</body>
+</html>
